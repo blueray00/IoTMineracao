@@ -1,0 +1,28 @@
+{
+  "description": "Enviar dados de zonas da mina para QuantumLeap",
+  "subject": {
+    "entities": [
+      { "idPattern": "Zona.*", "type": "MineZone" }
+    ]
+  },
+  "notification": {
+    "http": {
+        "url": "http://quantumleap:8668/v2/notify",
+        "headers": {
+            "Fiware-Service": "iotmineracao",
+            "Fiware-ServicePath": "/"
+        }
+    },
+    "attrs": [
+      "temperatura",
+      "fumaca",
+      "gas",
+      "umidade",
+      "ventilacao",
+      "risco_atual",
+      "nivel_risco",
+      "timestamp"
+    ],
+    "attrsFormat": "normalized"
+  }
+}

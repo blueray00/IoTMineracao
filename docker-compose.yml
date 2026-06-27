@@ -1,0 +1,110 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: iot_mine_mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  orion:
+    image: fiware/orion:3.2.0
+    container_name: iot_mine_orion
+    environment:
+      - ORION_LOG_LEVEL=INFO
+      - CONTEXT_BROKER_LOG_LEVEL=INFO
+    entrypoint:
+      - /usr/bin/contextBroker
+      - -fg
+      - -multiservice
+      - -ngsiv1Autocast
+      - -disableFileLog
+      - -dbhost
+      - mongo
+    ports:
+      - '1026:1026'
+    depends_on:
+      - mosquitto
+      - mongo
+
+  crate:
+    image: crate:4.8.4
+    container_name: iot_mine_crate
+    environment:
+      - CRATE_HEAP_SIZE=1g
+    ports:
+      - '4200:4200'
+    volumes:
+      - crate_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  quantumleap:
+    image: orchestracities/quantumleap:latest
+    container_name: iot_mine_quantumleap
+    ports:
+      - "8668:8668"
+    environment:
+      - CRATE_HOST=crate
+      - CRATE_PORT=4200
+      - LOGLEVEL=INFO
+      - CRATE_CONN_TIMEOUT=30
+      - CRATE_CONN_RETRIES=10
+    depends_on:
+      crate:
+        condition: service_healthy
+      orion:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8668/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  node-red:
+    image: nodered/node-red:3.0.2
+    container_name: iot_mine_node_red
+    ports:
+      - '1880:1880'
+    volumes:
+      - node_red_data:/data
+    depends_on:
+      - mosquitto
+      - orion
+
+  orion-init:
+    image: curlimages/curl:8.4.0
+    container_name: iot_mine_orion_init
+    depends_on:
+      orion:
+        condition: service_started
+      quantumleap:
+        condition: service_healthy
+    volumes:
+      - ./scripts/orion-init.sh:/scripts/orion-init.sh:ro
+    entrypoint: ["sh", "/scripts/orion-init.sh"]
+    restart: 'no'
+  
+  mongo:
+    image: mongo:4.4
+    container_name: iot_mine_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mosquitto_data:
+  crate_data:
+  node_red_data:
+  mongo_data:
+
+networks:
+  default:
+    name: iot_network
