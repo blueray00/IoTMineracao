@@ -5,6 +5,7 @@ import random
 import signal
 import time
 import paho.mqtt.client as mqtt
+import requests
 
 MQTT_HOST = os.getenv('MQTT_HOST', 'localhost')
 MQTT_PORT = int(os.getenv('MQTT_PORT', '1883'))
@@ -21,6 +22,13 @@ BASE_VALUES = {
 
 EVENT_DURATION = 40
 EVENT_COOLDOWN = 100
+
+ORION_URL = "http://localhost:1026/v2/entities"
+HEADERS = {
+    "Content-Type": "application/json",
+    "Fiware-Service": "iotmineracao",
+    "Fiware-ServicePath": "/"
+}
 
 running = True
 active_event = None
@@ -44,12 +52,16 @@ def build_measurement(zone, event_strength):
     humidity = compute_value(BASE_VALUES['umidade'], 5.5, -event_strength * 0.5)
     ventilation = compute_value(BASE_VALUES['ventilacao'], 2.5, -event_strength * 0.4)
 
+    # cálculo simples de consumo energético (simulado)
+    consumo_energia = round(temperature * 0.4 + ventilation * 0.6 + random.uniform(5, 15), 2)
+
     return {
         'temperatura': temperature,
         'fumaca': smoke,
         'gas': gas,
         'umidade': humidity,
         'ventilacao': ventilation,
+        'consumo_energia': consumo_energia,
     }
 
 
@@ -73,6 +85,25 @@ def get_risk_level(risk_value):
         return 'moderado'
     return 'baixo'
 
+
+def update_orion_entity(zone, measurement, risk_value, risk_level):
+    entity_id = f"Zona{zone}"
+    payload = {
+        "temperatura": {"type": "Number", "value": measurement['temperatura']},
+        "fumaca": {"type": "Number", "value": measurement['fumaca']},
+        "gas": {"type": "Number", "value": measurement['gas']},
+        "umidade": {"type": "Number", "value": measurement['umidade']},
+        "ventilacao": {"type": "Number", "value": measurement['ventilacao']},
+        "risco_atual": {"type": "Number", "value": risk_value},
+        "nivel_risco": {"type": "Text", "value": risk_level},
+        "timestamp": {"type": "Text", "value": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+    }
+    try:
+        r = requests.patch(f"{ORION_URL}/{entity_id}/attrs", headers=HEADERS, json=payload)
+        if r.status_code not in (204, 200):
+            print(f"[publisher] falha ao atualizar Orion {entity_id}: {r.status_code} {r.text}")
+    except Exception as e:
+        print(f"[publisher] erro ao conectar Orion: {e}")
 
 def main():
     global active_event, last_event_at
@@ -120,14 +151,21 @@ def main():
                 'gas': measurement['gas'],
                 'umidade': measurement['umidade'],
                 'ventilacao': measurement['ventilacao'],
-                'risco_estimado': risk_value,
+                'consumo_energia': measurement['consumo_energia'],
+                'risco_atual': risk_value,
                 'nivel_risco': risk_level,
                 'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
             }
 
+            payload_json = json.dumps(payload)
+
+            # envia para MQTT
             topic = f'mina/zona{zone}/sensores'
-            client.publish(topic, json.dumps(payload), qos=0)
-            print(f'[publisher] {topic} -> {json.dumps(payload)}')
+            client.publish(topic, payload_json, qos=0)
+            print(f'[publisher] {topic} -> {payload_json}')
+
+            # Atualiza Orion diretamente
+            update_orion_entity(zone, measurement, risk_value, risk_level)
 
         time.sleep(PUBLISH_INTERVAL)
 
