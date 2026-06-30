@@ -205,6 +205,35 @@ Qual região da mina apresenta maior risco operacional neste momento?
 A Zona **{zona_critica["Zona"]}** possui o maior risco da operação, com índice de **{zona_critica["Risco"]:.1f}**, exigindo maior atenção da equipe de monitoramento.
 """)
 
+
+st.divider()
+
+st.subheader("Arquitetura da Solução")
+
+st.markdown("""
+Sensores Simulados
+
+↓
+
+MQTT (Mosquitto)
+
+↓
+
+Node-RED
+
+↓
+
+Orion Context Broker
+
+↓
+
+QuantumLeap
+
+↓
+
+Painel Streamlit
+""")
+
 # Atualização automática
 time.sleep(4)
 st.rerun()

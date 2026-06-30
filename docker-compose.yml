@@ -1,5 +1,5 @@
 services:
-  mosquitto:
+  mosquitto:   #mqtt
     image: eclipse-mosquitto:2.0
     container_name: iot_mine_mosquitto
     ports:
@@ -8,7 +8,7 @@ services:
       - mosquitto_data:/mosquitto/data
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
-  orion:
+  orion: #armazenar estado das entidades
     image: fiware/orion:3.2.0
     container_name: iot_mine_orion
     environment:
@@ -26,7 +26,7 @@ services:
       - '1026:1026'
     depends_on:
       - mosquitto
-      - mongo
+      - mongo 
 
   crate:
     image: crate:4.8.4
@@ -44,19 +44,19 @@ services:
       retries: 30
       start_period: 40s
 
-  quantumleap:
+  quantumleap: #para historico temporal
     image: orchestracities/quantumleap:latest
     container_name: iot_mine_quantumleap
     ports:
       - "8668:8668"
     environment:
-      - CRATE_HOST=crate
+      - CRATE_HOST=crate               #para armazenamento do historico
       - CRATE_PORT=4200
       - LOGLEVEL=INFO
       - CRATE_CONN_TIMEOUT=30
       - CRATE_CONN_RETRIES=10
     depends_on:
-      crate:
+      crate:    
         condition: service_healthy
       orion:
         condition: service_started
@@ -67,7 +67,7 @@ services:
       retries: 30
       start_period: 40s
 
-  node-red:
+  node-red:  #para integração e processamento
     image: nodered/node-red:3.0.2
     container_name: iot_mine_node_red
     ports:
@@ -91,7 +91,7 @@ services:
     entrypoint: ["sh", "/scripts/orion-init.sh"]
     restart: 'no'
   
-  mongo:
+  mongo:   #utilizado pelo orion
     image: mongo:4.4
     container_name: iot_mine_mongo
     ports:

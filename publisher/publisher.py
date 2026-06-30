@@ -66,15 +66,17 @@ def build_measurement(zone, event_strength):
 
 
 def calculate_risk(measurement):
-    return round(
-        measurement['temperatura']
-        + measurement['fumaca']
-        + measurement['gas']
-        - measurement['umidade']
-        - measurement['ventilacao'],
-        2,
+    risco = (
+        measurement["temperatura"] * 1.4 +
+        measurement["fumaca"] * 2.8 +
+        measurement["gas"] * 2.2 -
+        measurement["umidade"] * 0.5 -
+        measurement["ventilacao"] * 0.7
     )
 
+    risco = max(0, min(100, risco))
+
+    return round(risco, 1)
 
 def get_risk_level(risk_value):
     if risk_value >= 60:
@@ -94,6 +96,7 @@ def update_orion_entity(zone, measurement, risk_value, risk_level):
         "gas": {"type": "Number", "value": measurement['gas']},
         "umidade": {"type": "Number", "value": measurement['umidade']},
         "ventilacao": {"type": "Number", "value": measurement['ventilacao']},
+        "consumo_energia": {"type": "Number", "value": measurement['consumo_energia']},
         "risco_atual": {"type": "Number", "value": risk_value},
         "nivel_risco": {"type": "Text", "value": risk_level},
         "timestamp": {"type": "Text", "value": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
